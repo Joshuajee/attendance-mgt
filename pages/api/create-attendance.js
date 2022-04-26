@@ -5,17 +5,16 @@ import { sessionCookie } from '../../lib/session';
   
 export default withIronSessionApiRoute( async function handler(req, res) {
 
-    const prisma = new PrismaClient()
-    
-    // By unique identifier
-    const user = req.session.user
+  const prisma = new PrismaClient()
 
-    const attendanceSheet = await prisma.attendanceSheet.create({
-        data: {
-          userId: user.id,
-        },
-    })
+  const user = req.session.user
 
-    res.json({status: "success", data: attendanceSheet});
+  const attendanceSheet = await prisma.attendanceSheet.create({
+      data: {
+        userId: user.id,
+      },
+  })
+
+  res.json({status: "success", data: attendanceSheet});
     
 }, sessionCookie())

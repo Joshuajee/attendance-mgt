@@ -10,9 +10,6 @@ export default withIronSessionApiRoute( async function handler(req, res) {
 
     const {attendanceSheetId, action} = parseBody(req.body)
 
-    console.log(action)
-    
-    // By unique identifier
     const user = req.session.user
 
     const attendance = await prisma.attendance.findMany({
@@ -21,7 +18,6 @@ export default withIronSessionApiRoute( async function handler(req, res) {
             attendanceSheetId: attendanceSheetId
         }
     })
-
 
     //check if atendance have been created
     if (attendance.length === 0) {
@@ -38,7 +34,7 @@ export default withIronSessionApiRoute( async function handler(req, res) {
         return res.json({status: "success", data: attendance});
 
     } else if (action === "sign-out") {
-        const updateAttendance = await prisma.attendance.updateMany({
+        await prisma.attendance.updateMany({
             where: {
                 userId: user.id,
                 attendanceSheetId: attendanceSheetId
@@ -49,7 +45,7 @@ export default withIronSessionApiRoute( async function handler(req, res) {
             },
         })
 
-        return res.json({status: "success", data: attendance});
+        return res.json({status: "success", data: { ...attendance[0], signOut: true, signOutTime: new Date()}});
     }
 
     res.json({status: "success", data: attendance});

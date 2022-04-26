@@ -13,11 +13,10 @@ export default function Page(props) {
 
   const [attendanceSheet, setState] = useState(JSON.parse(props.attendanceSheet));
 
-
   const sign = useCallback((action="") => {
 
     const body = {
-      attendanceSheetId: attendanceSheet[0].id,
+      attendanceSheetId: attendanceSheet[0]?.id,
       action
     }
 
@@ -75,7 +74,7 @@ export default function Page(props) {
             props.isAdmin && <button className={dashboard.create} onClick={createAttendance}>Create Attendance Sheet</button>
           }
             
-          {
+          { attendanceSheet.length > 0 &&
 
             <table className={dashboard.table}>
               <thead>
@@ -86,16 +85,16 @@ export default function Page(props) {
 
               <tbody>
                 <tr>
-                  <td>{attendanceSheet[0].id}</td>
-                  <td>{attendanceSheet[0].createdAt}</td>
+                  <td>{attendanceSheet[0]?.id}</td>
+                  <td>{attendanceSheet[0]?.createdAt}</td>
 
                   {
-                    attendanceSheet[0].attendance.length != 0 ? 
+                    attendanceSheet[0]?.attendance.length != 0 ? 
                       <>
-                        <td>{attendanceSheet[0].attendance[0].signInTime}</td>
+                        <td>{attendanceSheet[0]?.attendance[0]?.signInTime}</td>
                         <td>{
-                          attendanceSheet[0].attendance[0].signOut ? 
-                          attendanceSheet[0].attendance[0].signOutTime: <button onClick={() => sign("sign-out")}> Sign Out </button> }</td>
+                          attendanceSheet[0]?.attendance[0]?.signOut ? 
+                          attendanceSheet[0]?.attendance[0]?.signOutTime: <button onClick={() => sign("sign-out")}> Sign Out </button> }</td>
                       </>
                       :
                       <>

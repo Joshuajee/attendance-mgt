@@ -12,9 +12,6 @@ export default function Page(props) {
 
   const data = JSON.parse(props.attendanceSheet)
 
-  console.log(data)
-
-
   return (
     <div>
 
@@ -44,7 +41,6 @@ export default function Page(props) {
 
             <tbody>
 
-
               {
                 data.map(data =>   {
 
@@ -68,7 +64,7 @@ export default function Page(props) {
                         (
                           <>
                             <td>{attendance[0]?.signInTime}</td>
-                            <td>{attendance[0]?.signOut ? "You did not Sign Out" : attendance[0]?.signOutTime}</td>
+                            <td>{attendance[0]?.signOut ? attendance[0]?.signOutTime : "You did not Sign Out"}</td>
                           </>
                         )
                         

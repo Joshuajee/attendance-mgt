@@ -76,7 +76,7 @@ export default function Page(props) {
 
                             <td>{data.signInTime}</td>
 
-                            <td>{data.signOut ? "You did not Sign Out" : attendance[0]?.signOutTime}</td>  
+                            <td>{data.signOut ? attendance[0]?.signOutTime: "User did not Sign Out"}</td>  
                     
                           </tr>
                         )
