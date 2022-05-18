@@ -2,7 +2,6 @@ const fastify = require('fastify')()
 
 
 async function noOpParser(req, payload) {
-
   return payload;
 }
 

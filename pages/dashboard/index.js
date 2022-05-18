@@ -1,7 +1,7 @@
 import { withIronSessionSsr } from "iron-session/next";
 import Head from 'next/head'
 import { useState, useCallback } from "react";
-import { PrismaClient } from '@prisma/client'
+import { Client } from "pg";
 import SideBar from '../../components/SideBar'
 import styles from '../../styles/Home.module.css'
 import dashboard from '../../styles/Dashboard.module.css'
@@ -16,7 +16,7 @@ export default function Page(props) {
   const sign = useCallback((action="") => {
 
     const body = {
-      attendanceSheetId: attendanceSheet[0]?.id,
+      sheet_id: attendanceSheet.id,
       action
     }
 
@@ -26,9 +26,9 @@ export default function Page(props) {
 
         setState(prevState => {
 
-          const newState = [...prevState]
+          const newState = {...prevState}
 
-          newState[0].attendance[0] = data.data
+          newState = data.data
 
           return newState
 
@@ -47,7 +47,7 @@ export default function Page(props) {
 
       if (data.status === "success") {
         alert("New Attendance Sheet Created")
-        setState([{...data.data, attendance:[]}])
+        setState({...data.data})
       }
 
     })
@@ -74,7 +74,7 @@ export default function Page(props) {
             props.isAdmin && <button className={dashboard.create} onClick={createAttendance}>Create Attendance Sheet</button>
           }
             
-          { attendanceSheet.length > 0 &&
+          { attendanceSheet &&
 
             <table className={dashboard.table}>
               <thead>
@@ -85,23 +85,10 @@ export default function Page(props) {
 
               <tbody>
                 <tr>
-                  <td>{attendanceSheet[0]?.id}</td>
-                  <td>{attendanceSheet[0]?.createdAt}</td>
-
-                  {
-                    attendanceSheet[0]?.attendance.length != 0 ? 
-                      <>
-                        <td>{attendanceSheet[0]?.attendance[0]?.signInTime}</td>
-                        <td>{
-                          attendanceSheet[0]?.attendance[0]?.signOut ? 
-                          attendanceSheet[0]?.attendance[0]?.signOutTime: <button onClick={() => sign("sign-out")}> Sign Out </button> }</td>
-                      </>
-                      :
-                      <>
-                        <td> <button onClick={() => sign()}> Sign In </button> </td>
-                        <td>{""}</td>
-                      </>
-                  }
+                  <td>{attendanceSheet.id}</td>
+                  <td>{attendanceSheet.created_at}</td>
+                  <td>{attendanceSheet.sign_in_time ? attendanceSheet.sign_in_time: <button onClick={() => sign("sign")}> Sign In </button> }</td>
+                  <td>{attendanceSheet.sign_out ? attendanceSheet.sign_out_time: <button onClick={() => sign("sign-out")}> Sign Out </button> }</td>  
                 </tr>
               </tbody>
 
@@ -121,25 +108,51 @@ export const getServerSideProps = withIronSessionSsr( async ({req}) => {
 
   const user = req.session.user
 
-  const prisma = new PrismaClient()
+  const client = new Client({connectionString: process.env.DATABASE_URL})
 
-  const attendanceSheet = await prisma.attendanceSheet.findMany({  
-    take: 1,
-    orderBy: {
-      id: 'desc',
-    },
-    include: { 
-      attendance: {
-        where: {
-          userId: user.id
-        },
+  await client.connect()
+
+  const attendanceSheetQuery = {
+    name: 'fetch-attendance-sheet',
+    text: `SELECT * FROM attendance_sheet ORDER BY id DESC LIMIT 1`
+  }
+
+  const sheet = (await client.query(attendanceSheetQuery)).rows[0]
+
+  const query = {
+    name: 'fetch-attendance',
+    text: `
+          SELECT
+            *
+          FROM
+            attendance
+          WHERE
+            sheet_id = $1
+          AND user_id = $2;`,
+          values: [sheet?.id,user.id],
+  }
+
+  const attendanceSheet = (await client.query(query)).rows[0]
+
+  if (attendanceSheet)
+    return {
+      props: {
+        attendanceSheet: JSON.stringify(attendanceSheet),
+        isAdmin: user.role === "ADMIN"
       }
     }
-  })
 
+  if (sheet)
+    return {
+      props: {
+        attendanceSheet: JSON.stringify(sheet),
+        isAdmin: user.role === "ADMIN"
+      }
+    }
+  
   return {
     props: {
-      attendanceSheet: JSON.stringify(attendanceSheet),
+      attendanceSheet: null,
       isAdmin: user.role === "ADMIN"
     }
   }

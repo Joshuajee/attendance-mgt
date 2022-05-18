@@ -1,6 +1,6 @@
 import { withIronSessionSsr } from "iron-session/next";
 import Head from 'next/head'
-import { PrismaClient } from '@prisma/client'
+import { Client } from "pg";
 import SideBar from '../../components/SideBar'
 import styles from '../../styles/Home.module.css'
 import dashboard from '../../styles/Dashboard.module.css'
@@ -10,7 +10,7 @@ import { sessionCookie } from "../../lib/session";
 
 export default function Page(props) {
 
-  const data = JSON.parse(props.attendanceSheet)
+  const data = JSON.parse(props.attendances)
 
   return (
     <div>
@@ -33,8 +33,11 @@ export default function Page(props) {
           <thead>
 
             <tr> 
-              <th> Attendance Id</th> <th>Date</th> 
-              <th>Sign In Time</th> <th>Sign Out Time</th> 
+              <th> Attendance ID</th> 
+              <th>Date</th> 
+              <th> Sheet ID</th> 
+              <th>Sign In Time</th> 
+              <th>Sign Out Time</th> 
             </tr> 
 
           </thead>
@@ -44,32 +47,15 @@ export default function Page(props) {
               {
                 data.map(data =>   {
 
-                  const {id, createdAt, attendance } = data
+                  const {id, created_at, sheet_id, sign_in, sign_out, sign_in_time, sign_out_time } = data
 
-  
                   return (
                     <tr key={id}> 
-
-                      <td>{id}</td> <td>{createdAt}</td>  
-
-                      { attendance.length === 0 ? 
-                      
-                        (
-                          <>
-                            <td>You did not Sign In</td>
-                            <td>You did not Sign Out</td>
-                          </>
-                        )
-                        :
-                        (
-                          <>
-                            <td>{attendance[0]?.signInTime}</td>
-                            <td>{attendance[0]?.signOut ? attendance[0]?.signOutTime : "You did not Sign Out"}</td>
-                          </>
-                        )
-                        
-                      }
-              
+                      <td>{id}</td> 
+                      <td>{created_at}</td> 
+                      <td>{sheet_id}</td>   
+                      <td>{!sign_in? "You did not Sign In": sign_in_time }</td>
+                      <td>{!sign_out? "You did not Sign Out": sign_out_time }</td>
                     </tr>
                   )
 
@@ -93,24 +79,30 @@ export const getServerSideProps = withIronSessionSsr( async ({req}) => {
 
   const user = req.session.user
 
-  const prisma = new PrismaClient()
-  // By unique identifier
-  const attendanceSheet = await prisma.attendanceSheet.findMany({
-    orderBy: {
-      id: 'desc',
-    },
-    include: { 
-      attendance: {
-        where: {
-          userId: user.id
-        },
-      }
-    }
-  })
+  const client = new Client({connectionString: process.env.DATABASE_URL})
+
+  await client.connect()
+
+  const query = {
+    name: 'fetch-attendances',
+    text: `
+          SELECT
+            *
+          FROM
+            attendance
+          WHERE
+            user_id = $1
+          ORDER BY id DESC;`,
+          values: [user.id],
+  }
+
+  const attendances = (await client.query(query)).rows
+
+  client.end()
 
   return {
     props: {
-      attendanceSheet: JSON.stringify(attendanceSheet),
+      attendances: JSON.stringify(attendances),
     }
   }
 

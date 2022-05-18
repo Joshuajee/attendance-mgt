@@ -1,51 +1,77 @@
-import { PrismaClient } from '@prisma/client'
 import { withIronSessionApiRoute } from "iron-session/next";
 import { parseBody } from '../../lib/parseBody';
 import { sessionCookie } from '../../lib/session';
-
+import { Client } from "pg";
   
 export default withIronSessionApiRoute( async function handler(req, res) {
 
-    const prisma = new PrismaClient()
-
-    const {attendanceSheetId, action} = parseBody(req.body)
+    const {sheet_id, action} = parseBody(req.body)
 
     const user = req.session.user
 
-    const attendance = await prisma.attendance.findMany({
-        where: {
-            userId: user.id,
-            attendanceSheetId: attendanceSheetId
-        }
-    })
+    const client = new Client({connectionString: process.env.DATABASE_URL})
+
+    await client.connect()
+
+    const query = {
+        name: 'fetch-attendance',
+        text: `
+            SELECT
+                *
+            FROM
+                attendance
+            WHERE
+                user_id = $1
+                AND sheet_id = $2;
+                `,
+            values: [user.id, sheet_id],
+    }
+    
+    const attendance = (await client.query(query)).rows[0]
 
     //check if atendance have been created
-    if (attendance.length === 0) {
-        const attendance = await prisma.attendance.create({
-            data: {
-                userId: user.id,
-                attendanceSheetId: attendanceSheetId,
-                signIn: true,
-                signOut: false,
-                signOutTime: new Date()
-            },
-        })   
+    if (!attendance) {
+
+        const query = {
+            name: 'insert-attendance',
+            text: `
+                INSERT INTO
+                    attendance (user_id, sheet_id)
+                VALUES
+                    ($1, $2)
+                RETURNING *;
+                    `,
+                values: [user.id, sheet_id],
+            }
+    
+        const attendance = (await client.query(query)).rows[0]
+
+        await client.end()
 
         return res.json({status: "success", data: attendance});
 
     } else if (action === "sign-out") {
-        await prisma.attendance.updateMany({
-            where: {
-                userId: user.id,
-                attendanceSheetId: attendanceSheetId
-            },
-            data: {
-              signOut: true,
-              signOutTime: new Date()
-            },
-        })
+        
+        const query = {
+            name: 'insert-attendance',
+            text: `
+                UPDATE
+                    attendance
+                SET
+                    sign_out = TRUE,
+                    sign_out_time = CURRENT_TIMESTAMP
+                WHERE
+                    id = $1
+                RETURNING *;
+                    `,
+                values: [attendance.id],
+            }
+    
+        const data = (await client.query(query)).rows[0]
 
-        return res.json({status: "success", data: { ...attendance[0], signOut: true, signOutTime: new Date()}});
+        await client.end()
+
+        return res.json({status: "success", data });
     }
 
     res.json({status: "success", data: attendance});

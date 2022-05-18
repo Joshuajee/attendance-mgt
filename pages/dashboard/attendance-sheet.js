@@ -1,6 +1,6 @@
 import { withIronSessionSsr } from "iron-session/next";
 import Head from 'next/head'
-import { PrismaClient } from '@prisma/client'
+import { Client } from "pg";
 import SideBar from '../../components/SideBar'
 import styles from '../../styles/Home.module.css'
 import dashboard from '../../styles/Dashboard.module.css'
@@ -11,6 +11,8 @@ import { sessionCookie } from "../../lib/session";
 export default function Page(props) {
 
   const data = JSON.parse(props.attendanceSheet)
+
+  console.log(data)
 
   return (
     <div>
@@ -28,71 +30,54 @@ export default function Page(props) {
 
         <div className={dashboard.users}>
 
-        {
-          data?.map(data => {
+        <table className={dashboard.table}>
 
-            const {id, createdAt, attendance } = data
+          <thead>
+            
+            <tr> 
+              <th> Attendance Id</th> <th>Date</th> <th>Sheet Id</th>
+              <th> Name </th> <th> Email </th> <th> Role </th>
+              <th>Sign In Time</th> <th>Sign Out Time</th> 
+            </tr> 
 
-            return (
-              <>
+          </thead>
 
-                <table key={data.id} className={dashboard.table}>
+          <tbody>
 
-                  <thead>
+            {
+              data?.map(data => {
+
+                const {id, created_at, attendance_id, sheet_id, name, email, role, sign_in_time, sign_out, sign_out_time  } = data
+
+                return (
+       
+                  <tr key={attendance_id}> 
+
+                    <td>{attendance_id}</td> 
                     
-                    <tr> 
-                      <th> Attendance Id</th> <th>Date</th> 
-                      <th> Name </th> <th> Email </th> <th> Role </th>
-                      <th>Sign In Time</th> <th>Sign Out Time</th> 
-                    </tr> 
+                    <td>{created_at}</td>  
 
-                  </thead>
+                    <td>{sheet_id}</td> 
 
-                  <tbody>
-
-                    {
-                      (attendance.length === 0)  &&
-                      (
-                        <>
-                        <tr><td> {id} </td> <td>{createdAt}</td> <td colSpan={5}> No User signed this sheet</td></tr>
-                        </>
-                      )
-                    }
-
-                    {
-                      attendance.map(data => {
-
-                        const {name, email, role} = data.user
-
-                      
-                        return (
-                          <tr key={id}> 
-
-                            <td>{id}</td> <td>{createdAt}</td>  
-
-                            <td>{name}</td> <td>{email}</td>
-
-                            <td>{role}</td>
-
-                            <td>{data.signInTime}</td>
-
-                            <td>{data.signOut ? attendance[0]?.signOutTime: "User did not Sign Out"}</td>  
+                    <td>{name}</td> 
                     
-                          </tr>
-                        )
+                    <td>{email}</td>
 
-                      })
+                    <td>{role}</td>
 
-                    }  
+                    <td>{sign_in_time}</td>
 
-                  </tbody>
+                    <td>{sign_out ? sign_out_time: "User did not Sign Out"}</td>  
+                        
+                  </tr>)
+
+              })
+
+            }
+
+            </tbody>
                   
-                </table>
-              </>
-            )
-          })
-          
-          }
+          </table>
 
         </div>
 
@@ -104,28 +89,27 @@ export default function Page(props) {
 
 export const getServerSideProps = withIronSessionSsr(async () => {
 
+  const client = new Client({connectionString: process.env.DATABASE_URL})
 
-  const prisma = new PrismaClient()
-  // By unique identifier
-  const attendanceSheet = await prisma.attendanceSheet.findMany({
-    orderBy: {
-      id: 'desc',
-    },
-    include: { 
-      attendance: {
-        include: { 
-          user: {
-            select: {
-              name: true, 
-              email: true, 
-              role: true
-            }
-          }
-        }
-      },
-    },
+  await client.connect()
 
-  })
+  const query = {
+    name: 'fetch-attendances',
+    text: `
+        SELECT
+          attendance.id as attendance_id,
+          *
+        FROM
+          attendance
+        JOIN users ON attendance.user_id = users.id
+        ORDER BY
+          sheet_id DESC
+          `
+  }
+
+  const attendanceSheet = (await client.query(query)).rows
+
+  client.end()
 
   return {
     props: {
