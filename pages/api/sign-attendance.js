@@ -5,7 +5,7 @@ import { Client } from "pg";
   
 export default withIronSessionApiRoute( async function handler(req, res) {
 
-    const {sheet_id, action} = parseBody(req.body)
+    const {id, action} = parseBody(req.body)
 
     const user = req.session.user
 
@@ -22,16 +22,23 @@ export default withIronSessionApiRoute( async function handler(req, res) {
                 attendance
             WHERE
                 user_id = $1
-                AND sheet_id = $2;
+                AND id = $2;
                 `,
-            values: [user.id, sheet_id],
+            values: [user.id, id],
     }
     
     const attendance = (await client.query(query)).rows[0]
 
-    //check if atendance have been created
+    //check if attendance have been created
     if (!attendance) {
 
+        const attendanceSheetQuery = {
+            name: 'fetch-attendance-sheet',
+            text: `SELECT id FROM attendance_sheet ORDER BY id DESC LIMIT 1`
+        }
+        
+        const sheetId = (await client.query(attendanceSheetQuery)).rows[0].id
+        
         const query = {
             name: 'insert-attendance',
             text: `
@@ -41,16 +48,23 @@ export default withIronSessionApiRoute( async function handler(req, res) {
                     ($1, $2)
                 RETURNING *;
                     `,
-                values: [user.id, sheet_id],
+                values: [user.id, sheetId],
             }
     
-        const attendance = (await client.query(query)).rows[0]
+        const data = (await client.query(query)).rows[0]
 
         await client.end()
 
-        return res.json({status: "success", data: attendance});
+        return res.json({status: "success", data });
 
     } else if (action === "sign-out") {
+
+        const attendanceSheetQuery = {
+            name: 'fetch-attendance-sheet',
+            text: `SELECT id FROM attendance_sheet ORDER BY id DESC LIMIT 1`
+        }
+        
+        const sheetId = (await client.query(attendanceSheetQuery)).rows[0].id
         
         const query = {
             name: 'insert-attendance',
@@ -61,10 +75,12 @@ export default withIronSessionApiRoute( async function handler(req, res) {
                     sign_out = TRUE,
                     sign_out_time = CURRENT_TIMESTAMP
                 WHERE
-                    id = $1
+                    id = $1 
+                AND
+                    sheet_id = $2
                 RETURNING *;
                     `,
-                values: [attendance.id],
+                values: [attendance.id, sheetId],
             }
     
         const data = (await client.query(query)).rows[0]

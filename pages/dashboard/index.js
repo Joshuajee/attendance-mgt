@@ -16,7 +16,7 @@ export default function Page(props) {
   const sign = useCallback((action="") => {
 
     const body = {
-      sheet_id: attendanceSheet.id,
+      id: attendanceSheet.id,
       action
     }
 
